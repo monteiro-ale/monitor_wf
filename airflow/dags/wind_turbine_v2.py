@@ -105,11 +105,23 @@ insert_data = PostgresOperator(
     dag=dag
 )
 
+def avalia_temp(**context):
+    temperatures = [float(context['ti'].xcom_pull(task_ids='get_data', key=f'temperature_{turbine_id}')) for turbine_id in range(1, 11)]
+    high_temp_ids = [str(turbine_id) for turbine_id, temp in enumerate(temperatures, 1) if temp >= 24]
+    context['ti'].xcom_push(key='high_temp_ids', value=', '.join(high_temp_ids))
+    # high_temp_ids = [i + 1 for i, temp in enumerate(temperatures) if temp >= 24]
+    # context['ti'].xcom_push(key='high_temp_ids', value=high_temp_ids)
+
+    if high_temp_ids:
+        return 'group_check_temp.send_email_alert'
+    else:
+        return 'group_check_temp.send_email_normal'
+
 send_email_alert = EmailOperator(
     task_id='send_email_alert',
     to='monteiro.tec32@gmail.com',
     subject='Airflow Alert',
-    html_content='''<h3>Alerta de Temperatura</h3><p> Dag: windturbine</p>''',
+    html_content='''<h3>Turbinas com temperatura acima de 24°C: {{ task_instance.xcom_pull(task_ids='group_check_temp.check_temp_branch', key='high_temp_ids') }}</h3>''',
     task_group=group_check_temp,
     dag=dag
 )
@@ -123,12 +135,7 @@ send_email_normal = EmailOperator(
     dag=dag
 )
 
-def avalia_temp(**context):
-    temperatures = [float(context['ti'].xcom_pull(task_ids='get_data', key=f'temperature_{turbine_id}')) for turbine_id in range(1, 11)]
-    if any(temp >= 24 for temp in temperatures):
-        return 'group_check_temp.send_email_alert'
-    else:
-        return 'group_check_temp.send_email_normal'
+
 
 check_temp_branch = BranchPythonOperator(
     task_id='check_temp_branch',
