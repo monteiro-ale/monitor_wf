@@ -6,5 +6,3 @@ CREATE TABLE alerts (
     severity VARCHAR(50),
     resolved BOOLEAN
 );
-
---Criar a partir da Sensors
