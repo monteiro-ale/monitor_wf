@@ -5,3 +5,4 @@ CREATE TABLE maintenance (
     maintenance_type VARCHAR(255),
     notes TEXT
 );
+
