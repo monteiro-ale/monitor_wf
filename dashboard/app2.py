@@ -25,22 +25,32 @@ def fetch_data():
 
     try:
         cursor = conn.cursor()
-        cursor.execute('''
-            SELECT turbine_id, COUNT(*) as alert_count, alert_type
-            FROM alerts
-            GROUP BY turbine_id, alert_type
-            ORDER BY turbine_id
-        ''')
+        cursor.execute('''SELECT turbine_id, COUNT(*) as alert_count,
+                                    alert_type
+                                    FROM alerts
+                                    GROUP BY turbine_id, alert_type
+                                    ORDER BY turbine_id;
+                        ''')
         rows = cursor.fetchall()
         columns = [desc[0] for desc in cursor.description]
-        return pd.DataFrame(rows, columns=columns)
+        df = pd.DataFrame(rows, columns=columns)
+
+        # Remove duplicatas da coluna 'turbine_id'
+        df = df.drop_duplicates(subset=['turbine_id'])
+
+        # Reindex para incluir todos os IDs de turbina
+        all_turbine_ids = range(1, 11)  # Assumindo que os IDs de turbina vão de 1 a 10
+        df = df.set_index('turbine_id').reindex(all_turbine_ids, fill_value=0).reset_index()
+
+        return df
+
     except psycopg2.Error as e:
         st.error(f"Error fetching data from the database: {e}")
         return pd.DataFrame()
     finally:
-        if 'cursor' in locals() and cursor is not None:
+        if 'cursor' in locals():
             cursor.close()
-        if 'conn' in locals() and conn is not None:
+        if 'conn' in locals():
             conn.close()
 
 def main():
@@ -59,10 +69,10 @@ def main():
         fig = px.bar(filtered_data, x='turbine_id', y='alert_count', title=f'Number of {selected_alert_type} Alerts per Turbine', labels={'alert_count': 'Number of Alerts'})
         st.plotly_chart(fig)
     else:
-        st.write(f"No data available for the selected alert type: {selected_alert_type}")
+        st.write("No data available for the selected alert type")
 
 if __name__ == "__main__":
     main()
 
 
-#python -m streamlit run dashboard/app.py
+#python -m streamlit run dashboard/app2.py
