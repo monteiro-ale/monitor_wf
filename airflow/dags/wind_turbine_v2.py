@@ -105,6 +105,14 @@ insert_data = PostgresOperator(
     dag=dag
 )
 
+exec_proc = PostgresOperator(
+    task_id='exec_procedure',
+    postgres_conn_id='postgres',
+    sql='''CALL alerts_generate();''',
+		task_group=group_database,
+    dag=dag
+)
+
 def avalia_temp(**context):
     temperatures = [float(context['ti'].xcom_pull(task_ids='get_data', key=f'temperature_{turbine_id}')) for turbine_id in range(1, 11)]
     high_temp_ids = [str(turbine_id) for turbine_id, temp in enumerate(temperatures, 1) if temp >= 24]
@@ -149,7 +157,7 @@ with group_check_temp:
     check_temp_branch >> [send_email_alert, send_email_normal]
 
 with group_database:
-    create_table >> generate_sql_task >> insert_data
+    create_table >> generate_sql_task >> insert_data >> exec_proc
 
 file_sensor_task >> get_data
 get_data >> group_check_temp
