@@ -25,17 +25,15 @@ def fetch_data():
 
     try:
         cursor = conn.cursor()
-        cursor.execute('''SELECT turbine_id, alert_type, COUNT(*) as alert_count
-                          FROM alerts
-                          GROUP BY turbine_id, alert_type
-                          ORDER BY turbine_id;
-                       ''')
+        cursor.execute('''
+            SELECT turbine_id, COUNT(*) as alert_count, alert_type
+            FROM alerts
+            GROUP BY turbine_id, alert_type
+            ORDER BY turbine_id
+        ''')
         rows = cursor.fetchall()
         columns = [desc[0] for desc in cursor.description]
-        df = pd.DataFrame(rows, columns=columns)
-
-        return df
-
+        return pd.DataFrame(rows, columns=columns)
     except psycopg2.Error as e:
         st.error(f"Error fetching data from the database: {e}")
         return pd.DataFrame()
@@ -45,35 +43,52 @@ def fetch_data():
         if 'conn' in locals():
             conn.close()
 
+def plot_alerts_per_turbine(data, selected_alert_type):
+    filtered_data = data[data['alert_type'] == selected_alert_type]
+       
+    all_turbine_ids = range(1, 11)
+    if not filtered_data.empty:
+        filtered_data = filtered_data.set_index('turbine_id').reindex(all_turbine_ids, fill_value=0).reset_index()
+        filtered_data['turbine_display'] = filtered_data['turbine_id'].apply(lambda x: f'Turbina {x}')
+        fig = px.bar(filtered_data, x='turbine_display', y='alert_count', 
+                     title=f'Number of {selected_alert_type} Alerts per Turbine', 
+                     labels={'alert_count': 'Number of Alerts'})
+        st.plotly_chart(fig)
+    else:
+        st.write("No data available for the selected alert type")
+
+def plot_alert_distribution(data):
+    fig = px.pie(data, names='alert_type', values='alert_count', title='Distribuição de Alertas por Tipo')
+    st.plotly_chart(fig)
+
+def plot_stacked_bar(data):
+    data['turbine_display'] = data['turbine_id'].apply(lambda x: f'Turbina {x}')
+    fig = px.bar(data, x='turbine_display', y='alert_count', color='alert_type', title='Tipos de Alertas por Turbina', labels={'alert_count': 'Número de Alertas'})
+    st.plotly_chart(fig)
+
 def main():
+    st.title("Wind Turbine Monitoring Dashboard")
     data = fetch_data()
 
     if data.empty:
         st.write("No data available")
         return
 
+    st.sidebar.header("Filter")
     alert_types = data['alert_type'].unique()
-    selected_alert_type = st.selectbox("Select Alert Type", alert_types)
+    selected_alert_type = st.sidebar.selectbox("Select Alert Type", alert_types)
 
-    filtered_data = data[data['alert_type'] == selected_alert_type]
+    st.header("Alerts per Turbine")
+    plot_alerts_per_turbine(data, selected_alert_type)
 
-    # Garantir que todos os turbine_id de 1 a 10 apareçam no gráfico
-    all_turbine_ids = pd.DataFrame({'turbine_id': range(1, 11)})
-    filtered_data = all_turbine_ids.merge(filtered_data, on='turbine_id', how='left').fillna(0)
+    st.header("Alert Distribution")
+    plot_alert_distribution(data)
 
-    # Concatenar "Turbina" com o turbine_id
-    filtered_data['turbine_id'] = 'Turbina ' + filtered_data['turbine_id'].astype(str)
-
-    if not filtered_data.empty:
-        fig = px.bar(filtered_data, x='turbine_id', y='alert_count', title=f'Number of {selected_alert_type} Alerts per Turbine', labels={'alert_count': 'Number of Alerts'})
-        st.plotly_chart(fig)
-    else:
-        st.write("No data available for the selected alert type")
+    st.header("Stacked Bar Chart of Alerts")
+    plot_stacked_bar(data)
 
 if __name__ == "__main__":
     main()
 
 
 #python -m streamlit run dashboard/app.py
-#python watch_streamlit.py
-#C:/Users/usuario/Desktop/monitor_wf
