@@ -1,7 +1,7 @@
 import streamlit as st
 from dashboard import main as dashboard_main
 from resolve_alerts import main as resolve_alerts_main
-
+st.set_page_config(page_title="Dashboard de Monitoramento", page_icon=":bar_chart:")
 def main():
     st.sidebar.title("Navigation")
     pages = {

@@ -68,6 +68,7 @@ def fetch_sensor_data():
             conn.close()
 
 def plot_alerts_per_turbine(data, selected_alert_type):
+		
     filtered_data = data[data['alert_type'] == selected_alert_type]
        
     all_turbine_ids = range(1, 11)
@@ -86,8 +87,25 @@ def plot_alert_distribution(data):
     st.plotly_chart(fig)
 
 def plot_stacked_bar(data):
+    alert_colors = {
+        'High Temperature': '#FFABAB',
+        'Low Hydraulic Pressure': '#0068C9',
+        'Low Energy Efficiency': '#83C9FF', 
+    }
+
     data['turbine_display'] = data['turbine_id'].apply(lambda x: f'Turbina {x}')
-    fig = px.bar(data, x='turbine_display', y='alert_count', color='alert_type', title='Tipos de Alertas por Turbina', labels={'alert_count': 'Número de Alertas'})
+    
+    # Gráfico de barras
+    fig = px.bar(
+        data,
+        x='turbine_display',
+        y='alert_count',
+        color='alert_type',
+        title='Tipos de Alertas por Turbina',
+        labels={'alert_count': 'Número de Alertas'},
+        color_discrete_map=alert_colors  # Aplicar mapeamento de cores
+    )
+    
     st.plotly_chart(fig)
     
 def plot_temperature_variation(data):
