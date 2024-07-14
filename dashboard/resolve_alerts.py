@@ -54,7 +54,6 @@ def list_alerts():
                     submit_button = st.form_submit_button(label=button_label)
 
                     if submit_button:
-                        st.write('entrei no primeiro if')
                         # Atualizar o estado do alerta para resolvido na Alerts
                         cursor.execute('UPDATE alerts SET resolved = true WHERE alert_id = %s', (alert_id,))
                         conn.commit()
