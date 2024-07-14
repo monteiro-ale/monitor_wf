@@ -34,31 +34,54 @@ def list_alerts():
             st.write("No alerts found.")
             return
 
-        st.write("List of Alerts:")
         for alert in alerts_data:
             alert_id, turbine_id, formatted_date, alert_type, resolved = alert
-            
-            # Resolver o alerta
+
             if not resolved:
                 button_label = f"Resolve Alert {alert_id}"
-                if st.button(button_label, key=f"resolve_button_{alert_id}"):
-                    cursor.execute('UPDATE alerts SET resolved = true WHERE alert_id = %s', (alert_id,))
-                    conn.commit()
-                    st.success(f"Alert {alert_id} resolved successfully!")
+                with st.form(key=f"resolve_form_{alert_id}"):
+                    st.write(f"### Maintenance Details for Alert {alert_id}")
 
+                    st.markdown(f"**Alert ID:** {alert_id}")
+                    st.markdown(f"**Turbine ID:** {turbine_id}")
+                    st.markdown(f"**Timestamp:** {formatted_date}")
+                    st.markdown(f"**Alert Type:** {alert_type}")
+                    st.markdown(f"**Resolved:** {resolved}")
+                    st.markdown("---")
+
+                    maintenance_type = st.selectbox("Maintenance Type:", ["Scheduled", "Unscheduled"], key=f"maintenance_type_{alert_id}")
+                    notes = st.text_area("Notes:", key=f"notes_{alert_id}")
+                    submit_button = st.form_submit_button(label=button_label)
+
+                    if submit_button:
+                        st.write('entrei no primeiro if')
+                        # Atualizar o estado do alerta para resolvido na Alerts
+                        cursor.execute('UPDATE alerts SET resolved = true WHERE alert_id = %s', (alert_id,))
+                        conn.commit()
+                        st.success(f"Alert {alert_id} resolved successfully!")
+
+                        # Inserir dados na tabela maintenance
+                        cursor.execute('''
+                            INSERT INTO maintenance (turbine_id, maintenance_date, maintenance_type, notes)
+                            VALUES (%s, CURRENT_TIMESTAMP, %s, %s)
+                        ''', (turbine_id, maintenance_type, notes))
+                        conn.commit()
+                        st.success("Maintenance details submitted successfully!")
+
+            # Estilização em bloco usando markdown
             st.markdown(f"**Alert ID:** {alert_id}")
             st.markdown(f"**Turbine ID:** {turbine_id}")
             st.markdown(f"**Timestamp:** {formatted_date}")
             st.markdown(f"**Alert Type:** {alert_type}")
             st.markdown(f"**Resolved:** {resolved}")
-            st.markdown("---")
-            
+            st.markdown("---")  # Linha horizontal para separação entre os alertas
+
     except psycopg2.Error as e:
         st.error(f"Error fetching or updating alerts: {e}")
     finally:
-        if 'cursor' in locals() and cursor is not None:
+        if 'cursor' in locals():
             cursor.close()
-        if 'conn' in locals() and conn is not None:
+        if 'conn' in locals():
             conn.close()
 
 def main():
