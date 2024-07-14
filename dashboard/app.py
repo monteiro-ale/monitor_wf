@@ -51,7 +51,7 @@ def fetch_sensor_data():
     try:
         cursor = conn.cursor()
         cursor.execute('''
-            SELECT turbine_id, temperature, timestamp
+            SELECT turbine_id, temperature, hydraulicpressure, powerfactor, timestamp
             FROM sensors
             ORDER BY timestamp;
         ''')
@@ -81,6 +81,15 @@ def plot_alerts_per_turbine(data, selected_alert_type):
     else:
         st.write("No data available for the selected alert type")
 
+def plot_alert_distribution(data):
+    fig = px.pie(data, names='alert_type', values='alert_count', title='Distribuição de Alertas por Tipo')
+    st.plotly_chart(fig)
+
+def plot_stacked_bar(data):
+    data['turbine_display'] = data['turbine_id'].apply(lambda x: f'Turbina {x}')
+    fig = px.bar(data, x='turbine_display', y='alert_count', color='alert_type', title='Tipos de Alertas por Turbina', labels={'alert_count': 'Número de Alertas'})
+    st.plotly_chart(fig)
+    
 def plot_temperature_variation(data):
     fig = px.line(data, x='timestamp', y='temperature', color='turbine_id',
                   title='Variação da Temperatura ao Longo do Tempo',
@@ -111,18 +120,68 @@ def plot_temperature_variation(data):
 
     st.plotly_chart(fig)
 
+def plot_pressure_variation(data):
+    fig = px.line(data, x='timestamp', y='hydraulicpressure', color='turbine_id',
+                  title='Variação da Pressão Hidráulica ao Longo do Tempo',
+                  labels={'timestamp': 'Período de Tempo', 'hydraulicpressure': 'Pressão Hidr.'})
 
-def plot_alert_distribution(data):
-    fig = px.pie(data, names='alert_type', values='alert_count', title='Distribuição de Alertas por Tipo')
+    fig.add_shape(
+        type="line",
+        x0=data['timestamp'].min(),
+        y0=72,
+        x1=data['timestamp'].max(),
+        y1=72,
+        line=dict(color="Red", width=2, dash="dash"),
+        name="Pressão Hidráulica"
+    )
+
+    fig.add_annotation(
+        x=data['timestamp'].min(),
+        y=72,
+        xref="x",
+        yref="y",
+        text="Pressão Baixa (72 bar)",
+        showarrow=False,
+        font=dict(color="Red"),
+        align="left",
+        xshift=-60,  
+        yshift=10
+    )
+
     st.plotly_chart(fig)
 
-def plot_stacked_bar(data):
-    data['turbine_display'] = data['turbine_id'].apply(lambda x: f'Turbina {x}')
-    fig = px.bar(data, x='turbine_display', y='alert_count', color='alert_type', title='Tipos de Alertas por Turbina', labels={'alert_count': 'Número de Alertas'})
+def plot_powerfactor_variation(data):
+    fig = px.line(data, x='timestamp', y='powerfactor', color='turbine_id',
+                  title='Eficiência Energética ao Longo do Tempo',
+                  labels={'timestamp': 'Período de Tempo', 'powerfactor': 'Fator de Potência'})
+
+    fig.add_shape(
+        type="line",
+        x0=data['timestamp'].min(),
+        y0=0.8,
+        x1=data['timestamp'].max(),
+        y1=0.8,
+        line=dict(color="Red", width=2, dash="dash"),
+        name="Fator de Potência"
+    )
+
+    fig.add_annotation(
+        x=data['timestamp'].min(),
+        y=0.8,
+        xref="x",
+        yref="y",
+        text="Baixa Potência (0.8 kW)",
+        showarrow=False,
+        font=dict(color="Red"),
+        align="left",
+        xshift=-60,  
+        yshift=10
+    )
+
     st.plotly_chart(fig)
 
 def main():
-    st.title("Wind Turbine Monitoring Dashboard")
+    st.title("Wind Farm Monitor Dashboard")
     
     data = fetch_data()
     if data.empty:
@@ -149,6 +208,12 @@ def main():
     
     st.header("Temperature Variation Over Time")
     plot_temperature_variation(sensor_data)
+    
+    st.header("Pressure Variation Over Time")
+    plot_pressure_variation(sensor_data)
+    
+    st.header("Power Factor Variation Over Time")
+    plot_powerfactor_variation(sensor_data)
 
 if __name__ == "__main__":
     main()
