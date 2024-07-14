@@ -67,13 +67,7 @@ def list_alerts():
                         conn.commit()
                         st.success("Maintenance details submitted successfully!")
 
-            # Estilização em bloco usando markdown
-            st.markdown(f"**Alert ID:** {alert_id}")
-            st.markdown(f"**Turbine ID:** {turbine_id}")
-            st.markdown(f"**Timestamp:** {formatted_date}")
-            st.markdown(f"**Alert Type:** {alert_type}")
-            st.markdown(f"**Resolved:** {resolved}")
-            st.markdown("---")  # Linha horizontal para separação entre os alertas
+            st.markdown("---")
 
     except psycopg2.Error as e:
         st.error(f"Error fetching or updating alerts: {e}")
