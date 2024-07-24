@@ -27,6 +27,7 @@ def list_alerts():
         cursor.execute('''
             SELECT alert_id, turbine_id, TO_CHAR(alert_date, 'DD/MM/YYYY') as formatted_date, alert_type, resolved 
             FROM alerts
+						LIMIT 50;
         ''')
         alerts_data = cursor.fetchall()
 

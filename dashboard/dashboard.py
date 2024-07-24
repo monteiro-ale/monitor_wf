@@ -2,6 +2,8 @@ import psycopg2
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
+import re
 
 def get_database_connection():
     try:
@@ -66,6 +68,101 @@ def fetch_sensor_data():
             cursor.close()
         if 'conn' in locals():
             conn.close()
+
+def fetch_maintenance_data():
+    conn = get_database_connection()
+    if conn is None:
+        return None
+    
+    try:
+        query = '''
+            SELECT turbine_id, COUNT(*) as maintenance_count
+            FROM maintenance
+            GROUP BY turbine_id
+            ORDER BY turbine_id
+        '''
+        df = pd.read_sql(query, conn)
+        return df
+    except psycopg2.Error as e:
+        st.error(f"Error fetching maintenance data: {e}")
+        return None
+    finally:
+        if conn is not None:
+            conn.close()
+
+def fetch_maintenance_by_type():
+    conn = get_database_connection()
+    if conn is None:
+        return None
+
+    try:
+        query = '''
+            SELECT maintenance_type, COUNT(*) as count
+            FROM maintenance
+            GROUP BY maintenance_type
+            ORDER BY maintenance_type
+        '''
+        df = pd.read_sql(query, conn)
+        return df
+    except psycopg2.Error as e:
+        st.error(f"Error fetching maintenance data: {e}")
+        return None
+    finally:
+        if conn is not None:
+            conn.close()
+
+def fetch_turbine_locations():
+    conn = get_database_connection()
+    if conn is None:
+        return None
+
+    try:
+        query = '''
+            SELECT turbine_id, location
+            FROM turbines
+        '''
+        df = pd.read_sql(query, conn)
+        df[['latitude', 'longitude']] = df['location'].str.split(',', expand=True)
+        df['latitude'] = df['latitude'].apply(convert_coordinates)
+        df['longitude'] = df['longitude'].apply(convert_coordinates)
+        df['turbine_display'] = df['turbine_id'].apply(lambda x: f'Turbina {x}')
+        return df
+    except psycopg2.Error as e:
+        st.error(f"Error fetching turbine locations: {e}")
+        return None
+    finally:
+        if conn is not None:
+            conn.close()
+
+def fetch_capacity_by_manufacturer():
+    conn = get_database_connection()
+    if conn is None:
+        return None
+
+    try:
+        query = '''
+            SELECT manufacturer, SUM(capacity) as total_capacity
+            FROM turbines
+            GROUP BY manufacturer
+            ORDER BY manufacturer
+        '''
+        df = pd.read_sql(query, conn)
+        return df
+    except psycopg2.Error as e:
+        st.error(f"Error fetching capacity data: {e}")
+        return None
+    finally:
+        if conn is not None:
+            conn.close()
+
+
+
+def convert_coordinates(coord):
+    """Convert coordinates from '37.7749° N' format to float"""
+    coord = re.sub(r'[^\d.-]', '', coord)  # Remove all non-numeric, non-dot, non-hyphen characters
+    if 'S' in coord or 'W' in coord:
+        return -float(coord)
+    return float(coord)
 
 def plot_alerts_per_turbine(data, selected_alert_type):
 		
@@ -198,6 +295,53 @@ def plot_powerfactor_variation(data):
 
     st.plotly_chart(fig)
 
+def plot_maintenance_per_turbine(data):
+    all_turbine_ids = range(1, 11)  # Lista de todos os IDs de turbinas esperados
+    
+    # Reindexar os dados para garantir que todas as turbinas estejam incluídas
+    data = data.set_index('turbine_id').reindex(all_turbine_ids, fill_value=0).reset_index()
+    data['turbine_display'] = data['turbine_id'].apply(lambda x: f'Turbina {x}')
+    
+    fig = px.bar(data, x='turbine_display', y='maintenance_count', 
+                 title='Quantidade de Manutenções por Turbina', 
+                 labels={'turbine_display': 'ID da Turbina', 'maintenance_count': 'Quantidade de Manutenções'})
+    st.plotly_chart(fig)
+
+def plot_maintenance_by_type(data):
+    fig = px.bar(data, x='maintenance_type', y='count', 
+                 title='Quantidade de Manutenções por Tipo', 
+                 labels={'maintenance_type': 'Tipo de Manutenção', 'count': 'Quantidade'})
+    st.plotly_chart(fig)
+
+def plot_turbine_locations(data):
+    fig = go.Figure(data=go.Scattergeo(
+        lon=data['longitude'],
+        lat=data['latitude'],
+        text=data['turbine_display'],
+        mode='markers',
+        marker=dict(
+            size=8,
+            color='blue',
+            symbol='circle'
+        )
+    ))
+
+    fig.update_layout(
+        title='Localização das Turbinas',
+        geo=dict(
+            scope='world',
+            projection_type='equirectangular',
+        )
+    )
+
+    st.plotly_chart(fig)
+
+def plot_capacity_by_manufacturer(data):
+    fig = px.bar(data, x='manufacturer', y='total_capacity', 
+                 title='Capacidade Total por Fabricante', 
+                 labels={'manufacturer': 'Fabricante', 'total_capacity': 'Capacidade Total (MW)'})
+    st.plotly_chart(fig)
+
 def main():
     st.title("Wind Farm Monitor Dashboard")
     
@@ -210,28 +354,60 @@ def main():
     if sensor_data.empty:
         st.write("No sensor data available")
         return
+    
+    maintenance_data = fetch_maintenance_data()
+    if maintenance_data.empty:
+        st.write("Não há dados de manutenção disponíveis.")
+        return
+    
+    maintenance_data_type = fetch_maintenance_by_type()
+    if maintenance_data.empty:
+        st.write("Não há dados de manutenção disponíveis.")
+        return
+    
+    turbine_locations = fetch_turbine_locations()
+    if turbine_locations.empty:
+        st.write("Não há dados de localização das turbinas disponíveis.")
+        return
+    
+    capacity_data = fetch_capacity_by_manufacturer()
+    if capacity_data.empty:
+        st.write("Não há dados de capacidade disponíveis.")
+        return
 
     st.sidebar.header("Filter")
     alert_types = data['alert_type'].unique()
     selected_alert_type = st.sidebar.selectbox("Select Alert Type", alert_types)
 
-    st.header("Alerts per Turbine")
+    st.header("Alertas por Turbina")
     plot_alerts_per_turbine(data, selected_alert_type)
 
-    st.header("Alert Distribution")
+    st.header("Distribuição de alertas")
     plot_alert_distribution(data)
 
-    st.header("Stacked Bar Chart of Alerts")
+    st.header("Todos os Alertas")
     plot_stacked_bar(data)
     
-    st.header("Temperature Variation Over Time")
+    st.header("Variação de Temperatura ao longo do tempo")
     plot_temperature_variation(sensor_data)
     
-    st.header("Pressure Variation Over Time")
+    st.header("Variação de Pressão ao longo do tempo")
     plot_pressure_variation(sensor_data)
     
-    st.header("Power Factor Variation Over Time")
+    st.header("Variação de Power Factor ao longo do tempo")
     plot_powerfactor_variation(sensor_data)
+    
+    st.header("Manutenções por Turbina")
+    plot_maintenance_per_turbine(maintenance_data)
+    
+    st.header("Quantidade de Manutenções por Tipo")
+    plot_maintenance_by_type(maintenance_data_type)
+    
+    st.header("Localização das Turbinas")
+    plot_turbine_locations(turbine_locations)
+    
+    st.header("Capacidade total por fabricante")
+    plot_capacity_by_manufacturer(capacity_data)
 
 if __name__ == "__main__":
     main()
