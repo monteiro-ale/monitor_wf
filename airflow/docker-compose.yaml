@@ -67,7 +67,7 @@ x-airflow-common:
     AIRFLOW__SCHEDULER__DAG_DIR_LIST_INTERVAL: 20
 
     AIRFLOW__SMTP__SMTP_HOST: smtp.gmail.com
-    AIRFLOW__SMTP__SMTP_USER: monteiro.tec32@gmail.com
+    AIRFLOW__SMTP__SMTP_USER: example@example.com
     AIRFLOW__SMTP__SMTP_PASSWORD: ldks yfii ddbz yhra
     AIRFLOW__SMTP__SMTP_PORT: 587
     AIRFLOW__SMTP__MAIL_FROM: Airflow
